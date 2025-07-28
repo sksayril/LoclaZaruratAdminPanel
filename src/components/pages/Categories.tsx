@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Plus, 
   Search, 
@@ -11,7 +11,8 @@ import {
   List,
   MoreVertical,
   CheckCircle,
-  XCircle
+  XCircle,
+  Loader2
 } from 'lucide-react';
 import { apiService } from '../../api';
 import { useApi } from '../../hooks/useApi';
@@ -69,14 +70,31 @@ const Categories: React.FC = () => {
     name: string;
   } | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalItems, setTotalItems] = useState(0);
+  const [itemsPerPage] = useState(10);
+  
+  // Intersection Observer ref
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
   // Toast hook
   const { addToast } = useToast();
 
   // API hooks
   const { loading, error, execute: fetchCategories } = useApi({
     onSuccess: (data) => {
-      setCategories(data.data || []);
-      setFilteredCategories(data.data || []);
+      if (currentPage === 1) {
+        setCategories(data.data || []);
+        setFilteredCategories(data.data || []);
+      } else {
+        setCategories(prev => [...prev, ...(data.data || [])]);
+        setFilteredCategories(prev => [...prev, ...(data.data || [])]);
+      }
+      setTotalItems(data.pagination?.totalItems || 0);
+      setHasMore((data.data || []).length === itemsPerPage);
     },
     onError: (error) => {
       addToast({
@@ -128,8 +146,19 @@ const Categories: React.FC = () => {
 
   // Load categories on component mount
   useEffect(() => {
-    fetchCategories(() => apiService.getCategories());
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchCategories(() => apiService.getCategories(1, itemsPerPage));
   }, []);
+
+  // Load more categories when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      setIsLoadingMore(true);
+      fetchCategories(() => apiService.getCategories(currentPage, itemsPerPage))
+        .finally(() => setIsLoadingMore(false));
+    }
+  }, [currentPage]);
 
   // Filter categories based on search and status
   useEffect(() => {
@@ -152,6 +181,30 @@ const Categories: React.FC = () => {
 
     setFilteredCategories(filtered);
   }, [categories, searchTerm, statusFilter]);
+
+  // Intersection Observer for infinite scroll
+  const lastElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || isLoadingMore) return;
+    
+    if (observerRef.current) observerRef.current.disconnect();
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setCurrentPage(prev => prev + 1);
+      }
+    });
+    
+    if (node) observerRef.current.observe(node);
+  }, [loading, isLoadingMore, hasMore]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+    setHasMore(true);
+    setCategories([]);
+    setFilteredCategories([]);
+    fetchCategories(() => apiService.getCategories(1, itemsPerPage));
+  }, [searchTerm, statusFilter]);
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -397,6 +450,20 @@ const Categories: React.FC = () => {
         </div>
       )}
 
+      {/* Pagination Info */}
+      {filteredCategories.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4 mb-4">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>
+              Showing {filteredCategories.length} of {totalItems} categories
+            </span>
+            <span>
+              Page {currentPage} • {itemsPerPage} items per page
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Categories Grid/List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -423,9 +490,10 @@ const Categories: React.FC = () => {
         </div>
       ) : (
         <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-          {filteredCategories.map((category) => (
+          {filteredCategories.map((category, index) => (
             <div
               key={category._id}
+              ref={index === filteredCategories.length - 1 ? lastElementRef : null}
               className={`bg-white rounded-lg shadow hover:shadow-md transition-shadow ${
                 viewMode === 'list' ? 'flex items-center p-4' : 'p-6'
               }`}
@@ -561,6 +629,23 @@ const Categories: React.FC = () => {
               )}
             </div>
           ))}
+          
+          {/* Loading indicator for infinite scroll */}
+          {isLoadingMore && (
+            <div className="col-span-full flex items-center justify-center py-8">
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Loading more categories...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* End of results indicator */}
+          {!hasMore && filteredCategories.length > 0 && (
+            <div className="col-span-full text-center py-8">
+              <p className="text-gray-500">You've reached the end of all categories</p>
+            </div>
+          )}
         </div>
       )}
 
