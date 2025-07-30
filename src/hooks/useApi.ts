@@ -30,8 +30,17 @@ export const useApi = (options: UseApiOptions = {}) => {
       const errorMessage = err.message || 'An error occurred';
       setError(errorMessage);
       
-      // Handle authentication errors
-      if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+      // Handle authentication errors - check for various unauthorized/expired token patterns
+      if (
+        err.message?.includes('401') || 
+        err.message?.includes('403') ||
+        err.message?.includes('Unauthorized') ||
+        err.message?.includes('Forbidden') ||
+        err.message?.includes('Token expired') ||
+        err.message?.includes('Invalid token') ||
+        err.message?.includes('Authentication failed')
+      ) {
+        console.log('Authentication error detected, logging out user:', errorMessage);
         logout();
       }
       
@@ -97,7 +106,7 @@ export const useLogout = () => {
   const executeLogout = useCallback(async () => {
     setLoading(true);
     try {
-      await logout();
+      logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

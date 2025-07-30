@@ -250,7 +250,19 @@ const getAuthToken = (): string | null => {
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    
+    // Enhanced error handling for authentication issues
+    if (response.status === 401) {
+      throw new Error('Unauthorized: Please log in again');
+    } else if (response.status === 403) {
+      throw new Error('Forbidden: You do not have permission to access this resource');
+    } else if (response.status === 404) {
+      throw new Error('Resource not found');
+    } else if (response.status >= 500) {
+      throw new Error('Server error: Please try again later');
+    } else {
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
   }
   return response.json();
 };
@@ -258,9 +270,68 @@ const handleResponse = async (response: Response) => {
 // API Service Class
 class ApiService {
   private baseURL: string;
+  private isRefreshing: boolean = false;
+  private failedQueue: Array<{ resolve: Function; reject: Function }> = [];
 
   constructor(baseURL: string = BASE_URL) {
     this.baseURL = baseURL;
+  }
+
+  // Process failed requests queue
+  private processQueue(error: any, token: string | null = null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(token);
+      }
+    });
+    this.failedQueue = [];
+  }
+
+  // Refresh token utility
+  private async refreshTokenIfNeeded(): Promise<string | null> {
+    const token = getAuthToken();
+    if (!token) return null;
+
+    // Check if token is expired or will expire soon
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Date.now() / 1000;
+      const fiveMinutes = 5 * 60; // 5 minutes in seconds
+      
+      if ((payload.exp - currentTime) < fiveMinutes) {
+        // Token will expire soon, try to refresh
+        if (!this.isRefreshing) {
+          this.isRefreshing = true;
+          
+          try {
+            const response = await this.refreshToken();
+            if (response.success) {
+              tokenManager.setToken(response.data.token);
+              this.processQueue(null, response.data.token);
+              this.isRefreshing = false;
+              return response.data.token;
+            } else {
+              throw new Error('Token refresh failed');
+            }
+          } catch (error) {
+            this.processQueue(error);
+            this.isRefreshing = false;
+            throw error;
+          }
+        } else {
+          // Return a promise that resolves when the refresh is complete
+          return new Promise((resolve, reject) => {
+            this.failedQueue.push({ resolve, reject });
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+    }
+    
+    return token;
   }
 
   // Authentication APIs
@@ -307,7 +378,7 @@ class ApiService {
     page: number;
     limit: number;
   }> {
-    const token = getAuthToken();
+    const token = await this.refreshTokenIfNeeded();
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -646,7 +717,7 @@ class ApiService {
       }>;
     };
   }> {
-    const token = getAuthToken();
+    const token = await this.refreshTokenIfNeeded();
     const response = await fetch(`${this.baseURL}/api/admin/dashboard`, {
       headers: {
         'Authorization': `Bearer ${token}`,

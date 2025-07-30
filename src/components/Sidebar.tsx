@@ -9,8 +9,10 @@ import {
   Building2,
   Tag,
   CreditCard,
-  Wallet
+  Wallet,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -19,6 +21,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, currentPage, setCurrentPage }) => {
+  const { logout } = useAuth();
+
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'vendor-data', icon: Users, label: 'Vendor Data' },
@@ -30,6 +34,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, currentPage, setCurrentPage }
     { id: 'reports', icon: BarChart3, label: 'Reports' },
     { id: 'pnl', icon: TrendingUp, label: 'My PnL' },
   ];
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <div className={`fixed left-0 top-0 h-full bg-gradient-to-b from-sky-600 to-sky-700 text-white transition-all duration-300 z-50 ${isOpen ? 'w-64' : 'w-16'}`}>
@@ -51,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, currentPage, setCurrentPage }
         </div>
       </div>
 
-      <nav className="mt-8">
+      <nav className="mt-8 flex-1">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -73,8 +81,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, currentPage, setCurrentPage }
         })}
       </nav>
 
+      {/* Logout Button */}
+      <div className="p-4 border-t border-sky-500">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-3 px-4 py-3 text-left transition-all duration-200 hover:bg-red-500 hover:text-white rounded-lg"
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {isOpen && (
+            <span className="font-medium">Logout</span>
+          )}
+        </button>
+      </div>
+
       {isOpen && (
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-20 left-4 right-4">
           <div className="bg-sky-500 rounded-lg p-4 text-center">
             <p className="text-sm font-medium">Need Help?</p>
             <p className="text-xs text-sky-200 mt-1">Contact support</p>

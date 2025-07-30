@@ -57,9 +57,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error: any) {
           console.error('Token validation error:', error);
           
-          // Only clear auth if it's a 401/403 error, not network errors
-          if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
-            console.log('Unauthorized error, clearing auth');
+          // Check for specific authentication errors
+          const isAuthError = error.message && (
+            error.message.includes('401') || 
+            error.message.includes('403') ||
+            error.message.includes('Unauthorized') ||
+            error.message.includes('Forbidden') ||
+            error.message.includes('Token expired') ||
+            error.message.includes('Invalid token') ||
+            error.message.includes('Authentication failed')
+          );
+          
+          if (isAuthError) {
+            console.log('Authentication error detected, clearing auth');
             tokenManager.clearAuth();
           } else {
             // For network errors, keep the user logged in but show a warning
@@ -113,6 +123,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    console.log('Logging out user...');
+    
     // Clear auth data using token manager
     tokenManager.clearAuth();
     
@@ -123,10 +135,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     // Call logout API (optional, for server-side cleanup)
     if (token) {
-      apiService.logout().catch(() => {
-        // Ignore logout API errors
+      apiService.logout().catch((error) => {
+        // Ignore logout API errors, but log them
+        console.log('Logout API call failed (this is normal):', error);
       });
     }
+    
+    console.log('User logged out successfully');
   };
 
   const value: AuthContextType = {

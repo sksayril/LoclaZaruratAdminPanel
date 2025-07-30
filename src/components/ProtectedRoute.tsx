@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -11,6 +11,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   fallback 
 }) => {
   const { isAuthenticated, loading } = useAuth();
+
+  // Handle authentication state changes
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      console.log('User not authenticated, redirecting to login...');
+      // The AuthContext will handle the redirect automatically
+      // by setting isAuthenticated to false, which will show the LoginPage
+    }
+  }, [isAuthenticated, loading]);
 
   if (loading) {
     return (
@@ -33,7 +42,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You need to be logged in to access this page.</p>
+          <p className="text-gray-600 mb-4">You need to be logged in to access this page.</p>
+          <p className="text-sm text-gray-500">Redirecting to login...</p>
         </div>
       </div>
     );
