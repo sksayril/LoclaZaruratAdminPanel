@@ -10,7 +10,8 @@ import {
   Tag,
   CreditCard,
   Wallet,
-  LogOut
+  LogOut,
+  UserCog
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, currentPage, setCurrentPage }
     { id: 'categories', icon: Tag, label: 'Categories' },
     { id: 'subscription-users', icon: CreditCard, label: 'Subscription Users' },
     { id: 'withdrawal-requests', icon: Wallet, label: 'Withdrawal Requests' },
+    { id: 'super-employee', icon: UserCog, label: 'Super Employee' },
     { id: 'revenue', icon: DollarSign, label: 'My Revenue' },
     { id: 'reports', icon: BarChart3, label: 'Reports' },
     { id: 'pnl', icon: TrendingUp, label: 'My PnL' },

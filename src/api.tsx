@@ -1482,6 +1482,107 @@ class ApiService {
     });
     return handleResponse(response);
   }
+
+  // Super Employee Management APIs
+  async getSuperEmployees(page: number = 1, limit: number = 10, status: string = 'all', role: string = 'all', search?: string): Promise<{
+    success: boolean;
+    data: any[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+    };
+  }> {
+    const token = getAuthToken();
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      status: status,
+      role: role,
+    });
+    if (search) params.append('search', search);
+
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response);
+  }
+
+  async getSuperEmployeeById(employeeId: string): Promise<{ success: boolean; data: any }> {
+    const token = getAuthToken();
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response);
+  }
+
+  async createSuperEmployee(employeeData: any): Promise<{ success: boolean; data: any; message: string }> {
+    const token = getAuthToken();
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(employeeData),
+    });
+    return handleResponse(response);
+  }
+
+  async updateSuperEmployee(employeeId: string, employeeData: any): Promise<{ success: boolean; data: any; message: string }> {
+    const token = getAuthToken();
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(employeeData),
+    });
+    return handleResponse(response);
+  }
+
+  async deleteSuperEmployee(employeeId: string): Promise<{ success: boolean; message: string }> {
+    const token = getAuthToken();
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response);
+  }
+
+  async updateSuperEmployeeStatus(employeeId: string, status: 'active' | 'inactive' | 'suspended'): Promise<{ success: boolean; data: any; message: string }> {
+    const token = getAuthToken();
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    });
+    return handleResponse(response);
+  }
+
+  async updateSuperEmployeePermissions(employeeId: string, permissions: string[]): Promise<{ success: boolean; data: any; message: string }> {
+    const token = getAuthToken();
+    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}/permissions`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ permissions }),
+    });
+    return handleResponse(response);
+  }
 }
 
 // Create and export a singleton instance

@@ -8,6 +8,7 @@ import Customers from './pages/Customers';
 import Categories from './pages/Categories';
 import SubscriptionUsers from './pages/SubscriptionUsers';
 import WithdrawalRequests from './pages/WithdrawalRequests';
+import SuperEmployee from './pages/SuperEmployee';
 import Revenue from './pages/Revenue';
 import Reports from './pages/Reports';
 import PnL from './pages/PnL';
@@ -38,6 +39,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         return <SubscriptionUsers />;
       case 'withdrawal-requests':
         return <WithdrawalRequests />;
+      case 'super-employee':
+        return <SuperEmployee />;
       case 'revenue':
         return <Revenue />;
       case 'reports':
