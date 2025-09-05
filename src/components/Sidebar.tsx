@@ -95,15 +95,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, currentPage, setCurrentPage }
           )}
         </button>
       </div>
-
-      {isOpen && (
-        <div className="absolute bottom-20 left-4 right-4">
-          <div className="bg-sky-500 rounded-lg p-4 text-center">
-            <p className="text-sm font-medium">Need Help?</p>
-            <p className="text-xs text-sky-200 mt-1">Contact support</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
