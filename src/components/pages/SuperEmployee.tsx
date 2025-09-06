@@ -957,14 +957,6 @@ const SuperEmployee: React.FC = () => {
             <Search className="w-4 h-4" />
             <span>Get by Area</span>
           </button>
-
-          <button
-            onClick={() => openModal('add')}
-            className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Super Employee</span>
-          </button>
         </div>
       </div>
 
