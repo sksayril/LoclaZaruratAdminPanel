@@ -2,8 +2,8 @@
 // Base URL: http://localhost:3100
 
 // const BASE_URL = 'https://7cvccltb-3100.inc1.devtunnels.ms';
-// const BASE_URL = 'http://localhost:3110';
-const BASE_URL = 'https://api.localzarurat.com';
+const BASE_URL = 'http://localhost:3110';
+// const BASE_URL = 'https://api.localzarurat.com';
 
 // Types for API responses
 export interface LoginRequest {
@@ -237,6 +237,146 @@ export interface ReportData {
   completedOrders: number;
   pendingOrders: number;
   cancelledOrders: number;
+}
+
+// Super Employee Management Types
+export interface AssignedDistrict {
+  district: string;
+  state: string;
+  assignedAt: string;
+  assignedBy: string;
+}
+
+export interface CommissionSettings {
+  percentage: number;
+  isActive: boolean;
+  setBy: string;
+  setAt: string;
+}
+
+export interface EmployeeStatistics {
+  totalSellersAssigned: number;
+  totalCommissionEarned: number;
+  totalCommissionPaid: number;
+  lastCommissionDate?: string;
+}
+
+export interface EmployeeWallet {
+  balance: number;
+  transactions: any[];
+}
+
+export interface SuperEmployee {
+  _id: string;
+  employeeId: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'super_employee' | 'employee';
+  isActive: boolean;
+  assignedDistricts: AssignedDistrict[];
+  commissionSettings: CommissionSettings;
+  wallet: EmployeeWallet;
+  statistics: EmployeeStatistics;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSuperEmployeeRequest {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  assignedDistricts: Array<{
+    district: string;
+    state: string;
+  }>;
+  commissionPercentage: number;
+}
+
+export interface District {
+  _id: string;
+  name: string;
+  state: string;
+  code: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+  statistics: {
+    totalSellers: number;
+    totalSuperEmployees: number;
+    totalEmployees: number;
+    totalRevenue: number;
+    lastUpdated: string;
+  };
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface CreateDistrictRequest {
+  name: string;
+  state: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+export interface EmployeeCommission {
+  _id: string;
+  employee: {
+    _id: string;
+    employeeId: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  seller: {
+    _id: string;
+    name: string;
+    email: string;
+    vendorDetails: {
+      shopName: string;
+    };
+  };
+  subscription: {
+    _id: string;
+    plan: string;
+    amount: number;
+    status: string;
+  };
+  commission: {
+    percentage: number;
+    amount: number;
+    subscriptionAmount: number;
+  };
+  status: 'pending' | 'paid' | 'cancelled';
+  district: {
+    name: string;
+    state: string;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  createdAt: string;
+}
+
+export interface CommissionSummary {
+  pending: {
+    count: number;
+    amount: number;
+  };
+  paid: {
+    count: number;
+    amount: number;
+  };
+  cancelled: {
+    count: number;
+    amount: number;
+  };
 }
 
 import { tokenManager } from './utils/tokenManager';
@@ -665,7 +805,7 @@ class ApiService {
     return handleResponse(response);
   }
 
-  // Dashboard APIs
+  // Dashboard APIs (Legacy - use getAdminDashboard for new structure)
   async getDashboardStats(): Promise<{
     success: boolean;
     data: {
@@ -1483,10 +1623,38 @@ class ApiService {
     return handleResponse(response);
   }
 
-  // Super Employee Management APIs
-  async getSuperEmployees(page: number = 1, limit: number = 10, status: string = 'all', role: string = 'all', search?: string): Promise<{
+  // ========================================
+  // SUPER EMPLOYEE MANAGEMENT APIs
+  // ========================================
+
+  // Create Super Employee
+  async createSuperEmployee(employeeData: CreateSuperEmployeeRequest): Promise<{
     success: boolean;
-    data: any[];
+    message: string;
+    data: SuperEmployee;
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employees/super-employee/create`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(employeeData),
+    });
+    return handleResponse(response);
+  }
+
+  // Get All Employees
+  async getEmployees(params: {
+    page?: number;
+    limit?: number;
+    role?: 'super_employee' | 'employee' | 'all';
+    status?: 'active' | 'inactive' | 'all';
+    search?: string;
+  } = {}): Promise<{
+    success: boolean;
+    data: SuperEmployee[];
     pagination: {
       currentPage: number;
       totalPages: number;
@@ -1494,16 +1662,16 @@ class ApiService {
       itemsPerPage: number;
     };
   }> {
-    const token = getAuthToken();
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      status: status,
-      role: role,
-    });
-    if (search) params.append('search', search);
+    const token = await this.refreshTokenIfNeeded();
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.role && params.role !== 'all') queryParams.append('role', params.role);
+    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
+    if (params.search) queryParams.append('search', params.search);
 
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees?${params}`, {
+    const response = await fetch(`${this.baseURL}/api/admin/employees?${queryParams}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -1511,33 +1679,23 @@ class ApiService {
     return handleResponse(response);
   }
 
-  async getSuperEmployeeById(employeeId: string): Promise<{ success: boolean; data: any }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    return handleResponse(response);
-  }
-
-  async getPendingSuperEmployees(page: number = 1, limit: number = 10): Promise<{
+  // Get Employee Details
+  async getEmployeeById(employeeId: string): Promise<{
     success: boolean;
-    data: any[];
-    pagination: {
-      currentPage: number;
-      totalPages: number;
-      totalItems: number;
-      itemsPerPage: number;
+    data: {
+      employee: SuperEmployee;
+      statistics: {
+        assignedSellers: number;
+        commissionStats: Array<{
+          _id: string;
+          count: number;
+          totalAmount: number;
+        }>;
+      };
     };
   }> {
-    const token = getAuthToken();
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-    });
-
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/pending?${params}`, {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employees/${employeeId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -1545,198 +1703,140 @@ class ApiService {
     return handleResponse(response);
   }
 
-  async approveSuperEmployee(requestData: {
-    superEmployeeId: string;
-    status: 'approved';
-    adminNotes: string;
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-    return handleResponse(response);
-  }
-
-  async rejectSuperEmployee(requestData: {
-    superEmployeeId: string;
-    status: 'rejected';
-    rejectionReason: string;
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/reject`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-    return handleResponse(response);
-  }
-
-  async updateSuperEmployeePermissions(requestData: {
-    superEmployeeId: string;
-    permissions: string[];
-    accessLevel: string;
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/permissions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-    return handleResponse(response);
-  }
-
-  async deactivateSuperEmployee(requestData: {
-    superEmployeeId: string;
-    reason: string;
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/deactivate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-    return handleResponse(response);
-  }
-
-  async getSuperEmployeeStatistics(): Promise<{ success: boolean; data: any }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/statistics`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    return handleResponse(response);
-  }
-
-  async assignAreaToSuperEmployee(requestData: {
-    superEmployeeId: string;
-    areaId: string;
-    areaName: string;
-    areaType: string;
-    areaCode: string[];
-    notes: string;
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/assign-area`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-    return handleResponse(response);
-  }
-
-  async removeAreaFromSuperEmployee(requestData: {
-    superEmployeeId: string;
-    areaId: string;
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/remove-area`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-    return handleResponse(response);
-  }
-
-  async updateAreaPermissions(requestData: {
-    superEmployeeId: string;
-    areaPermissions: {
-      canAssignAreas: boolean;
-      canViewAllAreas: boolean;
-      canManageAreaVendors: boolean;
-      canManageAreaCustomers: boolean;
+  // Update Employee Status
+  async updateEmployeeStatus(employeeId: string, isActive: boolean): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      _id: string;
+      employeeId: string;
+      name: string;
+      email: string;
+      isActive: boolean;
+      updatedAt: string;
     };
-  }): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/area-permissions`, {
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employees/${employeeId}/status`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestData),
+      body: JSON.stringify({ isActive }),
     });
     return handleResponse(response);
   }
 
-  async createSuperEmployee(employeeData: any): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees`, {
+  // Assign Districts to Employee
+  async assignDistrictsToEmployee(employeeId: string, districts: Array<{
+    district: string;
+    state: string;
+  }>): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      employee: {
+        _id: string;
+        employeeId: string;
+        name: string;
+        assignedDistricts: AssignedDistrict[];
+      };
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employees/${employeeId}/districts`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(employeeData),
+      body: JSON.stringify({ districts }),
     });
     return handleResponse(response);
   }
 
-  async updateSuperEmployee(employeeId: string, employeeData: any): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(employeeData),
-    });
-    return handleResponse(response);
-  }
-
-  async deleteSuperEmployee(employeeId: string): Promise<{ success: boolean; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}`, {
+  // Remove Districts from Employee
+  async removeDistrictsFromEmployee(employeeId: string, districtIds: number[]): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      employee: {
+        _id: string;
+        employeeId: string;
+        name: string;
+        assignedDistricts: AssignedDistrict[];
+      };
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employees/${employeeId}/districts`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
-      },
-    });
-    return handleResponse(response);
-  }
-
-  async updateSuperEmployeeStatus(employeeId: string, status: 'active' | 'inactive' | 'suspended'): Promise<{ success: boolean; data: any; message: string }> {
-    const token = getAuthToken();
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/${employeeId}/status`, {
-      method: 'PATCH',
-      headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ districtIds }),
     });
     return handleResponse(response);
   }
 
-  async getSuperEmployeesByArea(params: {
-    areaType?: string;
-    areaCode?: string;
+  // Set Commission Percentage
+  async setEmployeeCommission(employeeId: string, commissionPercentage: number): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      employee: {
+        _id: string;
+        employeeId: string;
+        name: string;
+        commissionSettings: CommissionSettings;
+      };
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employees/${employeeId}/commission`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ commissionPercentage }),
+    });
+    return handleResponse(response);
+  }
+
+  // ========================================
+  // DISTRICT MANAGEMENT APIs
+  // ========================================
+
+  // Create District
+  async createDistrict(districtData: CreateDistrictRequest): Promise<{
+    success: boolean;
+    message: string;
+    data: District;
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/districts/create`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(districtData),
+    });
+    return handleResponse(response);
+  }
+
+  // Get All Districts
+  async getDistricts(params: {
     page?: number;
     limit?: number;
+    state?: string;
+    search?: string;
   } = {}): Promise<{
     success: boolean;
-    data: any[];
+    data: District[];
     pagination: {
       currentPage: number;
       totalPages: number;
@@ -1744,15 +1844,178 @@ class ApiService {
       itemsPerPage: number;
     };
   }> {
-    const token = getAuthToken();
+    const token = await this.refreshTokenIfNeeded();
     const queryParams = new URLSearchParams();
     
-    if (params.areaType) queryParams.append('areaType', params.areaType);
-    if (params.areaCode) queryParams.append('areaCode', params.areaCode);
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.state) queryParams.append('state', params.state);
+    if (params.search) queryParams.append('search', params.search);
 
-    const response = await fetch(`${this.baseURL}/api/admin/super-employees/by-area?${queryParams}`, {
+    const response = await fetch(`${this.baseURL}/api/admin/districts?${queryParams}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response);
+  }
+
+  // ========================================
+  // EMPLOYEE COMMISSION MANAGEMENT APIs
+  // ========================================
+
+  // Get All Employee Commissions
+  async getEmployeeCommissions(params: {
+    page?: number;
+    limit?: number;
+    status?: 'pending' | 'paid' | 'cancelled' | 'all';
+    employeeId?: string;
+  } = {}): Promise<{
+    success: boolean;
+    data: {
+      commissions: EmployeeCommission[];
+      summary: CommissionSummary;
+    };
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
+    if (params.employeeId) queryParams.append('employeeId', params.employeeId);
+
+    const response = await fetch(`${this.baseURL}/api/admin/employee-commissions?${queryParams}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    return handleResponse(response);
+  }
+
+  // Approve Employee Commission
+  async approveEmployeeCommission(commissionId: string, adminNotes?: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      commission: {
+        _id: string;
+        status: string;
+        amount: number;
+        paidAt: string;
+        transactionId: string;
+      };
+      employee: {
+        name: string;
+        newWalletBalance: number;
+      };
+      seller: {
+        name: string;
+        shopName: string;
+      };
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employee-commissions/${commissionId}/approve`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ adminNotes }),
+    });
+    return handleResponse(response);
+  }
+
+  // Reject Employee Commission
+  async rejectEmployeeCommission(commissionId: string, adminNotes?: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      commission: {
+        _id: string;
+        status: string;
+        amount: number;
+        rejectedAt: string;
+      };
+      seller: {
+        name: string;
+        shopName: string;
+      };
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/employee-commissions/${commissionId}/reject`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ adminNotes }),
+    });
+    return handleResponse(response);
+  }
+
+  // ========================================
+  // UPDATED DASHBOARD & ANALYTICS APIs
+  // ========================================
+
+  // Get Admin Dashboard (Updated)
+  async getAdminDashboard(): Promise<{
+    success: boolean;
+    data: {
+      stats: {
+        totalVendors: number;
+        activeVendors: number;
+        totalCustomers: number;
+        totalProducts: number;
+        totalCategories: number;
+        totalSubCategories: number;
+        activeSubscriptions: number;
+        monthlyRevenue: number;
+        pendingCommissions: number;
+        totalCommissions: number;
+        totalCommissionAmount: number;
+      };
+      recentVendors: Array<{
+        _id: string;
+        name: string;
+        email: string;
+        vendorDetails: {
+          shopName: string;
+        };
+        createdAt: string;
+      }>;
+      recentCommissions: Array<{
+        _id: string;
+        referrer: {
+          name: string;
+          vendorDetails: {
+            shopName: string;
+          };
+        };
+        referredVendor: {
+          name: string;
+          vendorDetails: {
+            shopName: string;
+          };
+        };
+        commission: {
+          amount: number;
+        };
+        status: string;
+        createdAt: string;
+      }>;
+    };
+  }> {
+    const token = await this.refreshTokenIfNeeded();
+    const response = await fetch(`${this.baseURL}/api/admin/dashboard`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
