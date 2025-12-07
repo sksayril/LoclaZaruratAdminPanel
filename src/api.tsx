@@ -2,8 +2,8 @@
 // Base URL: http://localhost:3100
 
 // const BASE_URL = 'https://7cvccltb-3100.inc1.devtunnels.ms';
-const BASE_URL = 'http://localhost:3110';
-// const BASE_URL = 'https://api.localzarurat.com';
+// const BASE_URL = 'http://localhost:3110';
+const BASE_URL = 'https://api.localzarurat.com';
 
 // Types for API responses
 export interface LoginRequest {
